@@ -1,5 +1,6 @@
 // ============================================
-// 🎮 AVENTURA POKÉMON GBA - EDIÇÃO EXPANDIDA
+// 🎮 AVENTURA POKÉMON GBA - EDIÇÃO ULTRA
+// Gráficos Aprimorados | Mapa Expandido | Sistema Completo
 // ============================================
 
 const canvas = document.getElementById('gameCanvas');
@@ -7,13 +8,15 @@ const ctx = canvas.getContext('2d');
 const minimapCanvas = document.getElementById('minimap');
 const minimapCtx = minimapCanvas.getContext('2d');
 
+// Configurações do Jogo
 const TILE_SIZE = 16;
 const SCALED_TILE_SIZE = TILE_SIZE * 2;
 const SCREEN_WIDTH = 480;
 const SCREEN_HEIGHT = 320;
-const MAP_WIDTH = 40;
-const MAP_HEIGHT = 30;
+const MAP_WIDTH = 50;
+const MAP_HEIGHT = 40;
 
+// Estado do Jogo
 const gameState = {
     currentRegion: 'vila_inicial',
     dialogActive: false,
@@ -23,52 +26,94 @@ const gameState = {
     timeOfDay: 'day',
     weather: 'sunny',
     gameTime: 720,
+    weatherTimer: 0,
+    screenShake: 0,
+    particles: [],
     player: {
-        x: 10, y: 10, direction: 'down', moving: false,
-        name: 'Herói', level: 5, badges: [], money: 3000, steps: 0,
+        x: 15, y: 15, direction: 'down', moving: false,
+        name: 'Herói', level: 5, badges: [], money: 5000, steps: 0,
         pokemon: [
-            { name: 'Pikachu', level: 25, hp: 100, maxHp: 100 },
-            { name: 'Charmander', level: 22, hp: 85, maxHp: 85 },
-            { name: 'Bulbasaur', level: 20, hp: 90, maxHp: 90 }
+            { name: 'Pikachu', level: 28, hp: 120, maxHp: 120, attack: 65, defense: 45 },
+            { name: 'Charizard', level: 32, hp: 150, maxHp: 150, attack: 84, defense: 78 },
+            { name: 'Blastoise', level: 30, hp: 140, maxHp: 140, attack: 83, defense: 90 },
+            { name: 'Venusaur', level: 30, hp: 145, maxHp: 145, attack: 82, defense: 83 }
         ],
-        items: { 'Poção': 5, 'Poké Ball': 10, 'Super Poção': 2, 'Great Ball': 3 }
+        items: { 
+            'Poção': 10, 'Super Poção': 5, 'Hiper Poção': 2,
+            'Poké Ball': 15, 'Great Ball': 8, 'Ultra Ball': 3,
+            'Antídoto': 5, 'Cura Total': 3, 'Reviver': 2
+        },
+        quests: []
     },
-    npcs: [], items: [], trainers: [], flags: {}
+    npcs: [], items: [], trainers: [], flags: {}, wildPokemonEncounters: 0
 };
 
-const tileTypes = { GRASS: 0, DIRT_PATH: 1, WATER: 2, TREE: 3, FLOWER: 4, ROCK: 5, HOUSE: 6, FENCE: 7, SAND: 8, TALL_GRASS: 17, POKECENTER: 14, MART: 15, GYM: 16 };
+// Tipos de Tiles Expandidos
+const tileTypes = { 
+    GRASS: 0, DIRT_PATH: 1, WATER: 2, TREE: 3, FLOWER: 4, 
+    ROCK: 5, HOUSE: 6, FENCE: 7, SAND: 8, TALL_GRASS: 17, 
+    POKECENTER: 14, MART: 15, GYM: 16, SNOW: 18, ICE: 19,
+    BRIDGE: 20, CAVE: 21, LAVA: 22, RUINS: 23, BEACH: 24
+};
 
+// Cores dos Tiles com Gradientes
 const tileColors = {
-    0: ['#4a8c3a', '#5a9c4a', '#3a7c2a'], 1: ['#8b7355', '#9b8365', '#7b6345'],
-    2: ['#5ba3d0', '#6bb3e0', '#4b93c0'], 3: ['#2d5a27', '#3d6a37', '#1d4a17'],
-    4: ['#ff69b4', '#ff79c4', '#ff59a4'], 5: ['#808080', '#909090', '#707070'],
-    6: ['#cd853f', '#dd954f', '#bd752f'], 7: ['#8b4513', '#9b5523', '#7b3503'],
-    8: ['#f4d03f', '#ffe04f', '#e4c02f'], 14: ['#ff6b6b', '#ff7b7b', '#ff5b5b'],
-    15: ['#4a90d9', '#5aa0e9', '#3a80c9'], 16: ['#d4af37', '#e4bf47', '#c49f27'],
-    17: ['#2d6a27', '#3d7a37', '#1d5a17']
+    0: ['#4a8c3a', '#5a9c4a', '#3a7c2a'],      // Grama
+    1: ['#8b7355', '#9b8365', '#7b6345'],      // Caminho terra
+    2: ['#5ba3d0', '#6bb3e0', '#4b93c0'],      // Água
+    3: ['#2d5a27', '#3d6a37', '#1d4a17'],      // Árvore
+    4: ['#ff69b4', '#ff79c4', '#ff59a4'],      // Flor
+    5: ['#808080', '#909090', '#707070'],      // Rocha
+    6: ['#cd853f', '#dd954f', '#bd752f'],      // Casa
+    7: ['#8b4513', '#9b5523', '#7b3503'],      // Cerca
+    8: ['#f4d03f', '#ffe04f', '#e4c02f'],      // Areia
+    14: ['#ff6b6b', '#ff7b7b', '#ff5b5b'],     // Centro Pokémon
+    15: ['#4a90d9', '#5aa0e9', '#3a80c9'],     // Loja
+    16: ['#d4af37', '#e4bf47', '#c49f27'],     // Ginásio
+    17: ['#2d6a27', '#3d7a37', '#1d5a17'],     // Grama alta
+    18: ['#f0f8ff', '#f5faff', '#e8f4ff'],     // Neve
+    19: ['#b8d4e8', '#c8e4f8', '#a8c4d8'],     // Gelo
+    20: ['#8b6914', '#9b7924', '#7b5904'],     // Ponte
+    21: ['#4a4a4a', '#5a5a5a', '#3a3a3a'],     // Caverna
+    22: ['#ff4500', '#ff5510', '#ff3500'],     // Lava
+    23: ['#8b7355', '#9b8365', '#7b6345'],     // Ruínas
+    24: ['#f5deb3', '#ffecc3', '#e5d0a3']      // Praia
 };
 
+// Banco de Dados de NPCs Expandido
 const npcDatabase = [
-    { id: 1, name: 'Prof. Carvalho', dialog: ['Olá! Sou o Prof. Carvalho!', 'Estudo Pokémon há 30 anos.', 'Este é um mundo misterioso...', 'Cheio de criaturas incríveis!'], region: 'vila_inicial', x: 5, y: 5 },
-    { id: 2, name: 'Enfermeira Joy', dialog: ['Bem-vindo ao Centro Pokémon!', 'Cuidamos do seu time gratuitamente.', 'Seus Pokémon estão em boas mãos!'], region: 'vila_inicial', x: 8, y: 3 },
-    { id: 3, name: 'Ancião', dialog: ['Bem-vindo à nossa vila!', 'Dizem que há tesouros nas cavernas.', 'Cuidado com os Pokémon selvagens!'], region: 'vila_inicial', x: 12, y: 8 },
-    { id: 4, name: 'Luna', dialog: ['Oi! Você é novo por aqui?', 'Adoro explorar a floresta!', 'Já vi Pokémon raros lá dentro.'], region: 'vila_inicial', x: 15, y: 12 },
-    { id: 5, name: 'Treinador Red', dialog: ['Ei, você parece forte!', 'Vamos batalhar?', 'Meu Pikachu é o melhor!'], region: 'vila_inicial', x: 20, y: 10, battle: true },
-    { id: 6, name: 'Vendedora', dialog: ['Bem-vindo à loja!', 'Temos os melhores itens!', 'Promoção: Poké Balls hoje!'], region: 'vila_inicial', x: 10, y: 5 }
+    { id: 1, name: 'Prof. Carvalho', dialog: ['Olá! Sou o Prof. Carvalho!', 'Estudo Pokémon há 30 anos.', 'Este é um mundo misterioso...', 'Cheio de criaturas incríveis!'], region: 'vila_inicial', x: 8, y: 8, sprite: 'professor' },
+    { id: 2, name: 'Enfermeira Joy', dialog: ['Bem-vindo ao Centro Pokémon!', 'Cuidamos do seu time gratuitamente.', 'Seus Pokémon estão em boas mãos!'], region: 'vila_inicial', x: 12, y: 6, sprite: 'nurse' },
+    { id: 3, name: 'Ancião', dialog: ['Bem-vindo à nossa vila!', 'Dizem que há tesouros nas cavernas.', 'Cuidado com os Pokémon selvagens!'], region: 'vila_inicial', x: 18, y: 12, sprite: 'oldman' },
+    { id: 4, name: 'Luna', dialog: ['Oi! Você é novo por aqui?', 'Adoro explorar a floresta!', 'Já vi Pokémon raros lá dentro.'], region: 'vila_inicial', x: 22, y: 18, sprite: 'girl' },
+    { id: 5, name: 'Treinador Red', dialog: ['Ei, você parece forte!', 'Vamos batalhar?', 'Meu Pikachu é o melhor!'], region: 'vila_inicial', x: 30, y: 15, battle: true, sprite: 'trainer_m' },
+    { id: 6, name: 'Vendedora', dialog: ['Bem-vindo à loja!', 'Temos os melhores itens!', 'Promoção: Poké Balls hoje!'], region: 'vila_inicial', x: 16, y: 6, sprite: 'shop_girl' },
+    { id: 7, name: 'Bug Catcher', dialog: ['Insetos são os melhores!', 'Venha enfrentar!'], region: 'vila_inicial', x: 35, y: 25, battle: true, sprite: 'bug_catcher' },
+    { id: 8, name: 'Mestre do Ginásio', dialog: ['Eu sou o Líder deste Ginásio!', 'Prove seu valor em batalha!'], region: 'vila_inicial', x: 25, y: 10, sprite: 'gym_leader' },
+    { id: 9, name: 'Pescador', dialog: ['Pesco Pokémon aquáticos aqui!', 'Já peguei mais de 1000!'], region: 'vila_inicial', x: 40, y: 20, sprite: 'fisher' },
+    { id: 10, name: 'Cientista', dialog: ['Estudo a evolução dos Pokémon!', 'Fascinante, não acha?'], region: 'vila_inicial', x: 10, y: 25, sprite: 'scientist' }
 ];
 
+// Banco de Dados de Itens Expandido
 const itemDatabase = [
-    { id: 1, name: 'Poção', type: 'healing', effect: 'Recupera 20 HP', rarity: 'common', x: 14, y: 2, region: 'vila_inicial' },
-    { id: 2, name: 'Poké Ball', type: 'capture', effect: 'Captura Pokémon', rarity: 'common', x: 1, y: 8, region: 'vila_inicial' },
-    { id: 3, name: 'Super Poção', type: 'healing', effect: 'Recupera 50 HP', rarity: 'uncommon', x: 25, y: 5, region: 'vila_inicial' },
-    { id: 4, name: 'Great Ball', type: 'capture', effect: 'Melhor captura', rarity: 'uncommon', x: 30, y: 20, region: 'vila_inicial' },
-    { id: 5, name: 'Antídoto', type: 'status', effect: 'Cura envenenamento', rarity: 'common', x: 5, y: 25, region: 'vila_inicial' },
-    { id: 6, name: 'Cura Total', type: 'healing', effect: 'Cura tudo', rarity: 'rare', x: 35, y: 8, region: 'vila_inicial' }
+    { id: 1, name: 'Poção', type: 'healing', effect: 'Recupera 20 HP', rarity: 'common', x: 14, y: 10, region: 'vila_inicial' },
+    { id: 2, name: 'Poké Ball', type: 'capture', effect: 'Captura Pokémon', rarity: 'common', x: 5, y: 15, region: 'vila_inicial' },
+    { id: 3, name: 'Super Poção', type: 'healing', effect: 'Recupera 50 HP', rarity: 'uncommon', x: 35, y: 8, region: 'vila_inicial' },
+    { id: 4, name: 'Great Ball', type: 'capture', effect: 'Melhor captura', rarity: 'uncommon', x: 40, y: 30, region: 'vila_inicial' },
+    { id: 5, name: 'Antídoto', type: 'status', effect: 'Cura envenenamento', rarity: 'common', x: 8, y: 30, region: 'vila_inicial' },
+    { id: 6, name: 'Cura Total', type: 'healing', effect: 'Cura tudo', rarity: 'rare', x: 45, y: 12, region: 'vila_inicial' },
+    { id: 7, name: 'Hiper Poção', type: 'healing', effect: 'Recupera 200 HP', rarity: 'rare', x: 20, y: 35, region: 'vila_inicial' },
+    { id: 8, name: 'Ultra Ball', type: 'capture', effect: 'Captura superior', rarity: 'rare', x: 30, y: 35, region: 'vila_inicial' },
+    { id: 9, name: 'Reviver', type: 'revive', effect: 'Revive Pokémon', rarity: 'ultra_rare', x: 42, y: 5, region: 'vila_inicial' },
+    { id: 10, name: 'Pedra Lunar', type: 'evolution', effect: 'Evolui certos Pokémon', rarity: 'ultra_rare', x: 3, y: 38, region: 'vila_inicial' }
 ];
 
+// Banco de Dados de Treinadores Expandido
 const trainerDatabase = [
-    { id: 1, name: 'Treinador Red', region: 'vila_inicial', x: 20, y: 10, team: [{ name: 'Pikachu', level: 25, hp: 100 }], reward: 1000, dialog: ['Vamos batalhar!', 'Pikachu, escolha eu!'] },
-    { id: 2, name: 'Bug Catcher', region: 'vila_inicial', x: 25, y: 18, team: [{ name: 'Caterpie', level: 12, hp: 50 }], reward: 480, dialog: ['Insetos são os melhores!', 'Venha enfrentar!'] }
+    { id: 1, name: 'Treinador Red', region: 'vila_inicial', x: 30, y: 15, team: [{ name: 'Pikachu', level: 35, hp: 120, attack: 75, defense: 50 }], reward: 2500, dialog: ['Vamos batalhar!', 'Pikachu, escolha eu!'], sprite: 'trainer_m' },
+    { id: 2, name: 'Bug Catcher', region: 'vila_inicial', x: 35, y: 25, team: [{ name: 'Butterfree', level: 28, hp: 90, attack: 45, defense: 40 }, { name: 'Beedrill', level: 26, hp: 85, attack: 55, defense: 35 }], reward: 1120, dialog: ['Insetos são os melhores!', 'Venha enfrentar!'], sprite: 'bug_catcher' },
+    { id: 3, name: 'Mestre do Ginásio', region: 'vila_inicial', x: 25, y: 10, team: [{ name: 'Charizard', level: 45, hp: 180, attack: 104, defense: 88 }, { name: 'Blastoise', level: 43, hp: 175, attack: 93, defense: 100 }], reward: 5400, dialog: ['Sou o Líder do Ginásio!', 'Prepare-se para batalhar!'], sprite: 'gym_leader' },
+    { id: 4, name: 'Ace Trainer', region: 'vila_inicial', x: 38, y: 32, team: [{ name: 'Arcanine', level: 40, hp: 160, attack: 110, defense: 70 }], reward: 3200, dialog: ['Você não vai ganhar fácil!', 'Mostre seu poder!'], sprite: 'trainer_f' }
 ];
 
 let currentDialog = null, dialogLineIndex = 0, dialogCharIndex = 0, dialogTypewriterInterval = null;
@@ -303,6 +348,12 @@ function updateHUD() {
     const timeDisplay = document.getElementById('player-time');
     const icon = gameState.timeOfDay === 'night' ? '🌙' : gameState.timeOfDay === 'evening' ? '🌅' : '☀️';
     timeDisplay.textContent = `${icon} ${formatTime(gameState.gameTime)}`;
+    
+    // Atualizar estatísticas do HUD
+    document.getElementById('hud-steps').textContent = gameState.player.steps;
+    document.getElementById('hud-money').textContent = `R$${gameState.player.money.toLocaleString('pt-BR')}`;
+    document.getElementById('hud-pokemon').textContent = gameState.player.pokemon.filter(p => p.hp > 0).length;
+    
     const badgesContainer = document.getElementById('hud-badges');
     badgesContainer.innerHTML = '';
     gameState.player.badges.forEach(() => {
@@ -310,6 +361,19 @@ function updateHUD() {
         b.className = 'badge';
         badgesContainer.appendChild(b);
     });
+    
+    // Atualizar indicador de região
+    const regionNames = {
+        'vila_inicial': 'VILA INICIAL',
+        'floresta': 'FLORESTA MISTERIOSA',
+        'cidade_porto': 'CIDADE PORTO',
+        'monte_lua': 'MONTE LUA',
+        'rota_1': 'ROTA 1',
+        'cidade_violeta': 'CIDADE VIOLETA',
+        'ilha_tesouro': 'ILHA DO TESOURO',
+        'caverna': 'CAVERNA DIGITAL'
+    };
+    document.getElementById('region-indicator').textContent = regionNames[gameState.currentRegion] || gameState.currentRegion.toUpperCase();
 }
 
 function setupEventListeners() {
