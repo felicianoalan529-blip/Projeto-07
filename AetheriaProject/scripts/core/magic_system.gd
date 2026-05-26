@@ -1,385 +1,314 @@
 extends Node
-## Magic System - Deep spell casting with 10 schools, 5 tiers, and world-altering magic
-## AETHERIA: Echoes of the Supreme
 
-signal spell_cast(caster: Node, spell_data: Dictionary, target: Variant)
-signal spell_completed(caster: Node, spell_data: Dictionary)
-spell_interrupted(caster: Node, spell_data: Dictionary)
-signal world_altered(event_id: String, description: String)
+class_name MagicSystem
 
-# Magic Schools
-enum School { ELEMENTAL, ARCANE, DIVINE, NECROTIC, NATURE, SPATIAL, ILLUSION, ENHANCEMENT, RUNIC, VOID }
+enum SpellTier {
+	BASIC,      # Tier 1 - Low cost, simple effects
+	ADVANCED,   # Tier 2 - Moderate cost, utility + damage
+	EXPERT,     # Tier 3 - High cost, powerful effects
+	MASTER,     # Tier 4 - Very high cost, area effects
+	WORLD       # Tier 5 - Extreme cost, world-altering
+}
 
-# Spell Tiers
-enum Tier { BASIC, NOVICE, ADEPT, MASTER, WORLD }
+enum SpellSchool {
+	ELEMENTAL_FIRE,
+	ELEMENTAL_WATER,
+	ELEMENTAL_EARTH,
+	ELEMENTAL_AIR,
+	Arcane,
+	DIVINE,
+	NECROTIC,
+	NATURE,
+	SPATIAL,
+	ILLUSION
+}
 
-# Casting State
-var active_casts: Dictionary = {} # caster -> {spell_data, start_time, cast_time}
-var channeling_spells: Dictionary = {} # caster -> {spell_data, channel_duration, elapsed}
-var cooldowns: Dictionary = {} # (spell_id, caster) -> remaining_time
+var spell_database: Dictionary = {}
+var active_effects: Array = []
 
-# Spell Registry - Will be populated from resources
-var spell_registry: Dictionary = {}
+signal spell_cast(spell_name: String, caster: Node, target: Node)
+signal world_altered(effect_type: String, location: Vector3)
 
-# Wild Magic Risk
-var wild_magic_enabled: bool = false
-var overcast_threshold: float = 0.3 # MP cost ratio that triggers wild magic risk
+func _ready():
+	initialize_spell_database()
+	print("[MagicSystem] Initialized with ", spell_database.size(), " spells")
 
-# Singleton Instance
-static var instance: MagicSystem
+func initialize_spell_database():
+	# === FIRE SPELLS ===
+	register_spell("Flame Dart", SpellSchool.ELEMENTAL_FIRE, SpellTier.BASIC, 8, 15, 0.5, 
+		"Deals small fire damage to a single target", {"damage": 25, "status": "burn"})
+	
+	register_spell("Fireball", SpellSchool.ELEMENTAL_FIRE, SpellTier.ADVANCED, 20, 30, 1.0,
+		"Hurls a ball of fire that explodes on impact", {"damage": 60, "radius": 4, "status": "burn"})
+	
+	register_spell("Inferno Wall", SpellSchool.ELEMENTAL_FIRE, SpellTier.EXPERT, 35, 45, 2.0,
+		"Creates a wall of flames that damages enemies passing through", {"damage": 40, "duration": 8, "width": 10})
+	
+	register_spell("Meteor Strike", SpellSchool.ELEMENTAL_FIRE, SpellTier.MASTER, 80, 90, 3.0,
+		"Summons a meteor from the sky to devastate an area", {"damage": 150, "radius": 8, "knockback": true})
+	
+	register_spell("Volcanic Eruption", SpellSchool.ELEMENTAL_FIRE, SpellTier.WORLD, 200, 120, 5.0,
+		"Permanently alters terrain by creating a volcano", {"damage": 300, "radius": 20, "alters_terrain": true})
+	
+	# === WATER SPELLS ===
+	register_spell("Water Splash", SpellSchool.ELEMENTAL_WATER, SpellTier.BASIC, 7, 12, 0.5,
+		"Splashes water at an enemy", {"damage": 20, "status": "wet"})
+	
+	register_spell("Healing Wave", SpellSchool.ELEMENTAL_WATER, SpellTier.ADVANCED, 25, 35, 1.5,
+		"Heals all allies in a cone", {"heal": 80, "arc": 60, "range": 15})
+	
+	register_spell("Ice Lance", SpellSchool.ELEMENTAL_WATER, SpellTier.ADVANCED, 18, 25, 0.8,
+		"Fires a sharp ice projectile", {"damage": 55, "status": "freeze", "slow": 0.5})
+	
+	register_spell("Tidal Wave", SpellSchool.ELEMENTAL_WATER, SpellTier.EXPERT, 45, 50, 2.5,
+		"Summons a massive wave that pushes enemies", {"damage": 90, "knockback": true, "radius": 12})
+	
+	register_spell("Frozen Domain", SpellSchool.ELEMENTAL_WATER, SpellTier.MASTER, 90, 100, 4.0,
+		"Freezes a large area solid", {"damage": 120, "status": "frozen", "radius": 15, "duration": 6})
+	
+	register_spell("Ocean Creation", SpellSchool.ELEMENTAL_WATER, SpellTier.WORLD, 220, 150, 6.0,
+		"Permanently floods an area creating a lake or sea", {"radius": 50, "alters_terrain": true, "depth": 10})
+	
+	# === EARTH SPELLS ===
+	register_spell("Stone Throw", SpellSchool.ELEMENTAL_EARTH, SpellTier.BASIC, 6, 10, 0.4,
+		"Throws a small stone at an enemy", {"damage": 30, "stagger": true})
+	
+	register_spell("Rock Armor", SpellSchool.ELEMENTAL_EARTH, SpellTier.ADVANCED, 22, 30, 1.0,
+		"Grants temporary armor made of stone", {"armor": 50, "duration": 30})
+	
+	register_spell("Earth Spike", SpellSchool.ELEMENTAL_EARTH, SpellTier.EXPERT, 38, 40, 1.5,
+		"Causes spikes to erupt from the ground", {"damage": 100, "radius": 5, "knockup": true})
+	
+	register_spell("Mountain Shield", SpellSchool.ELEMENTAL_EARTH, SpellTier.MASTER, 75, 80, 2.0,
+		"Creates an impenetrable barrier", {"health": 500, "duration": 20, "width": 15})
+	
+	register_spell("Land Rise", SpellSchool.ELEMENTAL_EARTH, SpellTier.WORLD, 180, 100, 5.0,
+		"Permanently raises terrain creating a mountain or plateau", {"height": 30, "radius": 25, "alters_terrain": true})
+	
+	# === AIR SPELLS ===
+	register_spell("Gust", SpellSchool.ELEMENTAL_AIR, SpellTier.BASIC, 5, 8, 0.3,
+		"Pushes enemies back with wind", {"damage": 15, "knockback": 5})
+	
+	register_spell("Lightning Bolt", SpellSchool.ELEMENTAL_AIR, SpellTier.ADVANCED, 24, 28, 0.7,
+		"Strikes an enemy with lightning", {"damage": 70, "chain": 3, "status": "shock"})
+	
+	register_spell("Wind Walk", SpellSchool.ELEMENTAL_AIR, SpellTier.EXPERT, 30, 35, 1.0,
+		"Grants increased movement speed and jump height", {"speed_boost": 0.8, "jump_boost": 2.0, "duration": 20})
+	
+	register_spell("Storm Call", SpellSchool.ELEMENTAL_AIR, SpellTier.MASTER, 85, 95, 3.5,
+		"Summons a thunderstorm over a large area", {"damage": 40, "hits": 8, "radius": 20})
+	
+	register_spell("Sky Tear", SpellSchool.ELEMENTAL_AIR, SpellTier.WORLD, 210, 130, 5.5,
+		"Creates a permanent floating island or rift in the sky", {"radius": 30, "alters_terrain": true, "floating": true})
+	
+	# === ARCANE SPELLS ===
+	register_spell("Arcane Missile", SpellSchool.Arcane, SpellTier.BASIC, 9, 14, 0.5,
+		"Fires a pure magic projectile", {"damage": 35, "pierces": true})
+	
+	register_spell("Mana Shield", SpellSchool.Arcane, SpellTier.ADVANCED, 28, 40, 1.0,
+		"Absorbs damage using mana instead of health", {"absorption": 100, "duration": 15})
+	
+	register_spell("Teleport", SpellSchool.Arcane, SpellTier.EXPERT, 35, 30, 0.8,
+		"Instantly teleports to target location", {"range": 25, "cooldown_reduction": 0})
+	
+	register_spell("Arcane Explosion", SpellSchool.Arcane, SpellTier.MASTER, 70, 75, 2.0,
+		"Releases energy in all directions", {"damage": 130, "radius": 12, "mana_cost_percent": 0.2})
+	
+	register_spell("Reality Fracture", SpellSchool.Arcane, SpellTier.WORLD, 250, 180, 7.0,
+		"Tears reality creating a zone of wild magic", {"radius": 40, "duration": 60, "wild_magic": true, "alters_terrain": true})
+	
+	# === DIVINE SPELLS ===
+	register_spell("Holy Light", SpellSchool.DIVINE, SpellTier.BASIC, 10, 16, 0.6,
+		"Damages undead and heals living", {"damage_vs_undead": 40, "heal_vs_living": 30})
+	
+	register_spell("Divine Protection", SpellSchool.DIVINE, SpellTier.ADVANCED, 30, 45, 1.2,
+		"Grants immunity to status effects", {"immunity_duration": 20, "magic_resist": 40})
+	
+	register_spell("Resurrection", SpellSchool.DIVINE, SpellTier.EXPERT, 60, 90, 3.0,
+		"Brings an ally back from death", {"revive_health": 0.5, "revive_mana": 0.3})
+	
+	register_spell("Judgment", SpellSchool.DIVINE, SpellTier.MASTER, 95, 110, 4.0,
+		"Deals massive damage based on target's sins", {"base_damage": 100, "multiplier_per_flag": 1.5})
+	
+	register_spell("Sacred Realm", SpellSchool.DIVINE, SpellTier.WORLD, 230, 160, 6.5,
+		"Consecrates land permanently against darkness", {"radius": 60, "permanent_buff": "holy_ground", "alters_terrain": true})
+	
+	# === NECROTIC SPELLS ===
+	register_spell("Dark Touch", SpellSchool.NECROTIC, SpellTier.BASIC, 8, 12, 0.5,
+		"Drains life from a single target", {"damage": 25, "lifesteal": 0.5})
+	
+	register_spell("Raise Skeleton", SpellSchool.NECROTIC, SpellTier.ADVANCED, 25, 35, 1.5,
+		"Summons a skeleton minion", {"minion_count": 1, "minion_hp": 50, "duration": 120})
+	
+	register_spell("Death Coil", SpellSchool.NECROTIC, SpellTier.EXPERT, 40, 50, 2.0,
+		"Chains life drain between multiple enemies", {"damage": 60, "chains": 5, "lifesteal": 0.4})
+	
+	register_spell("Army of Dead", SpellSchool.NECROTIC, SpellTier.MASTER, 100, 120, 4.5,
+		"Raises multiple undead warriors", {"minion_count": 8, "minion_hp": 100, "duration": 180})
+	
+	register_spell("Blight Lands", SpellSchool.NECROTIC, SpellTier.WORLD, 240, 150, 7.0,
+		"Corrupts land permanently spreading decay", {"radius": 50, "permanent_debuff": "blighted", "alters_terrain": true})
+	
+	# === NATURE SPELLS ===
+	register_spell("Vine Whip", SpellSchool.NATURE, SpellTier.BASIC, 7, 11, 0.4,
+		"Whips enemy with thorny vines", {"damage": 22, "root_duration": 1.5})
+	
+	register_spell("Regrowth", SpellSchool.NATURE, SpellTier.ADVANCED, 26, 38, 1.5,
+		"Heals target over time", {"heal_tick": 15, "ticks": 6, "interval": 2})
+	
+	register_spell("Entangle", SpellSchool.NATURE, SpellTier.EXPERT, 35, 42, 1.8,
+		"Roots all enemies in an area", {"root_duration": 5, "radius": 8, "damage": 30})
+	
+	register_spell("Ancient Guardian", SpellSchool.NATURE, SpellTier.MASTER, 88, 100, 3.5,
+		"Summons a powerful treant ally", {"minion_hp": 500, "minion_damage": 60, "duration": 120})
+	
+	register_spell("World Tree Sprout", SpellSchool.NATURE, SpellTier.WORLD, 200, 140, 8.0,
+		"Plants a massive tree that grows permanently", {"tree_height": 50, "radius": 30, "alters_terrain": true, "permanent": true})
+	
+	# === SPATIAL SPELLS ===
+	register_spell("Dimension Slash", SpellSchool.SPATIAL, SpellTier.BASIC, 11, 18, 0.6,
+		"Cuts through space dealing ignore-armor damage", {"damage": 40, "ignores_armor": true})
+	
+	register_spell("Portal", SpellSchool.SPATIAL, SpellTier.ADVANCED, 40, 60, 2.0,
+		"Creates linked portals", {"portal_duration": 60, "max_distance": 100})
+	
+	register_spell("Gravity Well", SpellSchool.SPATIAL, SpellTier.EXPERT, 45, 55, 2.5,
+		"Creates a gravity field pulling enemies", {"pull_strength": 15, "radius": 10, "duration": 8})
+	
+	register_spell("Time Dilation", SpellSchool.SPATIAL, SpellTier.MASTER, 95, 110, 4.0,
+		"Slows time in an area", {"slow_factor": 0.3, "radius": 15, "duration": 12})
+	
+	register_spell("Dimension Shift", SpellSchool.SPATIAL, SpellTier.WORLD, 260, 200, 10.0,
+		"Permanently shifts an area to another dimension", {"radius": 40, "alters_terrain": true, "dimension": "shadow"})
+	
+	# === ILLUSION SPELLS ===
+	register_spell("Mirror Image", SpellSchool.ILLUSION, SpellTier.BASIC, 12, 20, 0.8,
+		"Creates decoy images", {"image_count": 2, "duration": 15})
+	
+	register_spell("Invisibility", SpellSchool.ILLUSION, SpellTier.ADVANCED, 32, 45, 1.0,
+		"Turns target invisible", {"duration": 20, "break_on_attack": true})
+	
+	register_spell("Mass Confusion", SpellSchool.ILLUSION, SpellTier.EXPERT, 50, 60, 2.5,
+		"Causes enemies to attack each other", {"confusion_duration": 10, "radius": 12})
+	
+	register_spell("Phantom Army", SpellSchool.ILLUSION, SpellTier.MASTER, 85, 95, 3.5,
+		"Creates illusionary soldiers that deal partial damage", {"soldier_count": 10, "damage_multiplier": 0.4, "duration": 45})
+	
+	register_spell("Dreamscape", SpellSchool.ILLUSION, SpellTier.WORLD, 220, 170, 9.0,
+		"Overwrites reality with an illusion permanently", {"radius": 70, "alters_terrain": true, "illusion_permanent": true})
 
-func _ready() -> void:
-	instance = self
-	load_spell_database()
-	print("[MagicSystem] Initialized - 10 Schools of Magic Ready")
-
-func load_spell_database() -> void:
-	# Core spell definitions - In production, these would load from .tres resources
-	spell_registry = {
-		# === ELEMENTAL SCHOOL ===
-		"fireball": {"name": "Fireball", "school": School.ELEMENTAL, "tier": Tier.BASIC, "mp_cost": 10, "cast_time": 1.0, "cooldown": 2.0, "range": 20.0, "effect": "damage", "power": 50, "element": "fire"},
-		"inferno": {"name": "Inferno", "school": School.ELEMENTAL, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 2.0, "cooldown": 5.0, "range": 25.0, "effect": "aoe_damage", "power": 80, "element": "fire", "aoe_radius": 5.0},
-		"flame_wall": {"name": "Flame Wall", "school": School.ELEMENTAL, "tier": Tier.ADEPT, "mp_cost": 45, "cast_time": 2.5, "cooldown": 10.0, "range": 15.0, "effect": "create_barrier", "power": 60, "element": "fire", "duration": 15.0},
-		"volcanic_eruption": {"name": "Volcanic Eruption", "school": School.ELEMENTAL, "tier": Tier.MASTER, "mp_cost": 120, "cast_time": 5.0, "cooldown": 60.0, "range": 50.0, "effect": "massive_aoe", "power": 200, "element": "fire", "aoe_radius": 20.0, "terrain_alter": true},
-		"ice_shard": {"name": "Ice Shard", "school": School.ELEMENTAL, "tier": Tier.BASIC, "mp_cost": 10, "cast_time": 1.0, "cooldown": 2.0, "range": 20.0, "effect": "damage", "power": 45, "element": "ice", "status_effect": "slow"},
-		"blizzard": {"name": "Blizzard", "school": School.ELEMENTAL, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 2.0, "cooldown": 5.0, "range": 25.0, "effect": "aoe_damage", "power": 70, "element": "ice", "status_effect": "freeze", "aoe_radius": 6.0},
-		"ice_age": {"name": "Ice Age", "school": School.ELEMENTAL, "tier": Tier.WORLD, "mp_cost": 500, "cast_time": 10.0, "cooldown": 600.0, "range": 200.0, "effect": "world_transform", "power": 0, "element": "ice", "aoe_radius": 100.0, "permanent": true},
-		"lightning_bolt": {"name": "Lightning Bolt", "school": School.ELEMENTAL, "tier": Tier.BASIC, "mp_cost": 12, "cast_time": 0.8, "cooldown": 1.5, "range": 25.0, "effect": "damage", "power": 55, "element": "lightning", "instant": true},
-		"thunder_storm": {"name": "Thunder Storm", "school": School.ELEMENTAL, "tier": Tier.ADEPT, "mp_cost": 50, "cast_time": 3.0, "cooldown": 12.0, "range": 30.0, "effect": "multi_strike", "power": 40, "element": "lightning", "hits": 5},
-		"judgment_bolt": {"name": "Judgment Bolt", "school": School.ELEMENTAL, "tier": Tier.MASTER, "mp_cost": 150, "cast_time": 4.0, "cooldown": 45.0, "range": 40.0, "effect": "massive_aoe", "power": 250, "element": "lightning", "aoe_radius": 15.0},
-		
-		# === ARCANE SCHOOL ===
-		"magic_missile": {"name": "Magic Missile", "school": School.ARCANE, "tier": Tier.BASIC, "mp_cost": 8, "cast_time": 0.5, "cooldown": 1.0, "range": 30.0, "effect": "damage", "power": 40, "homing": true},
-		"arcane_blast": {"name": "Arcane Blast", "school": School.ARCANE, "tier": Tier.NOVICE, "mp_cost": 20, "cast_time": 1.5, "cooldown": 3.0, "range": 25.0, "effect": "damage", "power": 90, "penetrates_shields": true},
-		"mana_shield": {"name": "Mana Shield", "school": School.ARCANE, "tier": Tier.ADEPT, "mp_cost": 35, "cast_time": 1.0, "cooldown": 20.0, "range": 0.0, "effect": "buff", "duration": 30.0, "absorbs_damage": true},
-		"teleport": {"name": "Teleport", "school": School.ARCANE, "tier": Tier.ADEPT, "mp_cost": 40, "cast_time": 2.0, "cooldown": 15.0, "range": 50.0, "effect": "movement", "instant": true},
-		"reality_fracture": {"name": "Reality Fracture", "school": School.ARCANE, "tier": Tier.WORLD, "mp_cost": 600, "cast_time": 12.0, "cooldown": 900.0, "range": 100.0, "effect": "dimensional_tear", "power": 500, "permanent": true},
-		
-		# === DIVINE SCHOOL ===
-		"cure": {"name": "Cure", "school": School.DIVINE, "tier": Tier.BASIC, "mp_cost": 15, "cast_time": 1.5, "cooldown": 3.0, "range": 15.0, "effect": "heal", "power": 80},
-		"cura": {"name": "Cura", "school": School.DIVINE, "tier": Tier.NOVICE, "mp_cost": 30, "cast_time": 2.0, "cooldown": 5.0, "range": 20.0, "effect": "heal", "power": 150},
-		"curaga": {"name": "Curaga", "school": School.DIVINE, "tier": Tier.ADEPT, "mp_cost": 55, "cast_time": 2.5, "cooldown": 8.0, "range": 25.0, "effect": "heal", "power": 300},
-		"raise": {"name": "Raise", "school": School.DIVINE, "tier": Tier.MASTER, "mp_cost": 100, "cast_time": 5.0, "cooldown": 120.0, "range": 10.0, "effect": "resurrect", "power": 0},
-		"holy": {"name": "Holy", "school": School.DIVINE, "tier": Tier.MASTER, "mp_cost": 130, "cast_time": 4.0, "cooldown": 50.0, "range": 35.0, "effect": "massive_damage", "power": 280, "element": "holy", "effective_vs_undead": true},
-		"divine_intervention": {"name": "Divine Intervention", "school": School.DIVINE, "tier": Tier.WORLD, "mp_cost": 550, "cast_time": 8.0, "cooldown": 720.0, "range": 150.0, "effect": "mass_resurrect_heal", "power": 1000, "aoe_radius": 75.0},
-		
-		# === NECROTIC SCHOOL ===
-		"drain": {"name": "Drain", "school": School.NECROTIC, "tier": Tier.BASIC, "mp_cost": 12, "cast_time": 1.0, "cooldown": 2.0, "range": 15.0, "effect": "damage_heal", "power": 50, "steal_hp": true},
-		"dark_fire": {"name": "Dark Fire", "school": School.NECROTIC, "tier": Tier.NOVICE, "mp_cost": 22, "cast_time": 1.5, "cooldown": 3.0, "range": 20.0, "effect": "damage", "power": 85, "element": "dark", "dot_ticks": 3},
-		"summon_undead": {"name": "Summon Undead", "school": School.NECROTIC, "tier": Tier.ADEPT, "mp_cost": 45, "cast_time": 3.0, "cooldown": 30.0, "range": 10.0, "effect": "summon", "summon_type": "skeleton", "duration": 120.0},
-		"wither": {"name": "Wither", "school": School.NECROTIC, "tier": Tier.ADEPT, "mp_cost": 40, "cast_time": 2.0, "cooldown": 15.0, "range": 25.0, "effect": "debuff", "stat_reduction": "strength", "duration": 30.0},
-		"death": {"name": "Death", "school": School.NECROTIC, "tier": Tier.MASTER, "mp_cost": 140, "cast_time": 3.0, "cooldown": 90.0, "range": 20.0, "effect": "instant_kill", "success_rate": 0.5},
-		"apocalypse": {"name": "Apocalypse", "school": School.NECROTIC, "tier": Tier.WORLD, "mp_cost": 580, "cast_time": 10.0, "cooldown": 800.0, "range": 120.0, "effect": "mass_death", "aoe_radius": 60.0, "success_rate": 0.3},
-		
-		# === NATURE SCHOOL ===
-		"healing_wind": {"name": "Healing Wind", "school": School.NATURE, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 2.0, "cooldown": 8.0, "range": 30.0, "effect": "aoe_heal", "power": 100, "aoe_radius": 10.0},
-		"entangle": {"name": "Entangle", "school": School.NATURE, "tier": Tier.BASIC, "mp_cost": 10, "cast_time": 1.0, "cooldown": 5.0, "range": 20.0, "effect": "root", "duration": 5.0},
-		"poison_cloud": {"name": "Poison Cloud", "school": School.NATURE, "tier": Tier.NOVICE, "mp_cost": 20, "cast_time": 1.5, "cooldown": 6.0, "range": 25.0, "effect": "aoe_dot", "power": 30, "ticks": 5, "aoe_radius": 8.0},
-		"tree_form": {"name": "Tree Form", "school": School.NATURE, "tier": Tier.ADEPT, "mp_cost": 35, "cast_time": 2.0, "cooldown": 45.0, "range": 0.0, "effect": "self_buff", "defense_bonus": 50, "duration": 60.0},
-		"wrath_of_nature": {"name": "Wrath of Nature", "school": School.NATURE, "tier": Tier.MASTER, "mp_cost": 110, "cast_time": 4.0, "cooldown": 55.0, "range": 40.0, "effect": "massive_aoe", "power": 220, "aoe_radius": 18.0},
-		"genesis": {"name": "Genesis", "school": School.NATURE, "tier": Tier.WORLD, "mp_cost": 520, "cast_time": 15.0, "cooldown": 600.0, "range": 150.0, "effect": "terraform", "biome_transform": "forest", "aoe_radius": 80.0, "permanent": true},
-		
-		# === SPATIAL SCHOOL ===
-		"warp": {"name": "Warp", "school": School.SPATIAL, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 1.5, "cooldown": 10.0, "range": 40.0, "effect": "teleport_self"},
-		"gravity_well": {"name": "Gravity Well", "school": School.SPATIAL, "tier": Tier.ADEPT, "mp_cost": 45, "cast_time": 2.5, "cooldown": 20.0, "range": 30.0, "effect": "pull_enemies", "power": 0, "aoe_radius": 12.0, "duration": 5.0},
-		"black_hole": {"name": "Black Hole", "school": School.SPATIAL, "tier": Tier.MASTER, "mp_cost": 135, "cast_time": 4.0, "cooldown": 75.0, "range": 35.0, "effect": "massive_damage", "power": 300, "aoe_radius": 10.0, "sucks_in": true},
-		"dimension_door": {"name": "Dimension Door", "school": School.SPATIAL, "tier": Tier.ADEPT, "mp_cost": 50, "cast_time": 3.0, "cooldown": 25.0, "range": 100.0, "effect": "teleport_party"},
-		"spatial_rift": {"name": "Spatial Rift", "school": School.SPATIAL, "tier": Tier.WORLD, "mp_cost": 540, "cast_time": 8.0, "cooldown": 500.0, "range": 80.0, "effect": "create_portal", "permanent": false, "duration": 300.0},
-		
-		# === ILLUSION SCHOOL ===
-		"blur": {"name": "Blur", "school": School.ILLUSION, "tier": Tier.BASIC, "mp_cost": 10, "cast_time": 1.0, "cooldown": 15.0, "range": 0.0, "effect": "self_buff", "evasion_bonus": 30, "duration": 20.0},
-		"mirror_image": {"name": "Mirror Image", "school": School.ILLUSION, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 1.5, "cooldown": 30.0, "range": 0.0, "effect": "summon_decoy", "images": 2, "duration": 45.0},
-		"invisibility": {"name": "Invisibility", "school": School.ILLUSION, "tier": Tier.ADEPT, "mp_cost": 40, "cast_time": 2.0, "cooldown": 40.0, "range": 10.0, "effect": "stealth", "duration": 60.0},
-		"mass_confusion": {"name": "Mass Confusion", "school": School.ILLUSION, "tier": Tier.MASTER, "mp_cost": 100, "cast_time": 3.5, "cooldown": 60.0, "range": 35.0, "effect": "aoe_debuff", "aoe_radius": 15.0, "duration": 25.0},
-		"world_mirror": {"name": "World Mirror", "school": School.ILLUSION, "tier": Tier.WORLD, "mp_cost": 480, "cast_time": 6.0, "cooldown": 400.0, "range": 200.0, "effect": "mass_illusion", "creates_fake_world": true, "duration": 180.0},
-		
-		# === ENHANCEMENT SCHOOL ===
-		"strength_boost": {"name": "Strength Boost", "school": School.ENHANCEMENT, "tier": Tier.BASIC, "mp_cost": 12, "cast_time": 1.0, "cooldown": 5.0, "range": 15.0, "effect": "buff", "stat": "strength", "bonus": 20, "duration": 60.0},
-		"magic_boost": {"name": "Magic Boost", "school": School.ENHANCEMENT, "tier": Tier.BASIC, "mp_cost": 12, "cast_time": 1.0, "cooldown": 5.0, "range": 15.0, "effect": "buff", "stat": "magic", "bonus": 20, "duration": 60.0},
-		"haste": {"name": "Haste", "school": School.ENHANCEMENT, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 1.5, "cooldown": 10.0, "range": 15.0, "effect": "buff", "speed_bonus": 50, "duration": 90.0},
-		"protect": {"name": "Protect", "school": School.ENHANCEMENT, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 1.5, "cooldown": 10.0, "range": 15.0, "effect": "buff", "defense_bonus": 30, "duration": 120.0},
-		"shell": {"name": "Shell", "school": School.ENHANCEMENT, "tier": Tier.NOVICE, "mp_cost": 25, "cast_time": 1.5, "cooldown": 10.0, "range": 15.0, "effect": "buff", "magic_defense_bonus": 30, "duration": 120.0},
-		"omnistr": {"name": "Omnistrength", "school": School.ENHANCEMENT, "tier": Tier.MASTER, "mp_cost": 90, "cast_time": 3.0, "cooldown": 45.0, "range": 25.0, "effect": "party_buff", "all_stats_bonus": 40, "duration": 180.0},
-		
-		# === RUNIC SCHOOL ===
-		"rune_power": {"name": "Rune Power", "school": School.RUNIC, "tier": Tier.BASIC, "mp_cost": 15, "cast_time": 2.0, "cooldown": 10.0, "range": 0.0, "effect": "empower_next_spell", "power_multiplier": 1.5},
-		"rune_shield": {"name": "Rune Shield", "school": School.RUNIC, "tier": Tier.NOVICE, "mp_cost": 30, "cast_time": 2.0, "cooldown": 25.0, "range": 0.0, "effect": "barrier", "absorbs": 200, "duration": 45.0},
-		"rune_weapon": {"name": "Rune Weapon", "school": School.RUNIC, "tier": Tier.ADEPT, "mp_cost": 45, "cast_time": 2.5, "cooldown": 30.0, "range": 0.0, "effect": "weapon_enchant", "extra_damage": 50, "duration": 120.0},
-		"rune_armor": {"name": "Rune Armor", "school": School.RUNIC, "tier": Tier.ADEPT, "mp_cost": 50, "cast_time": 3.0, "cooldown": 40.0, "range": 0.0, "effect": "armor_enchant", "defense_bonus": 40, "duration": 180.0},
-		"ancient_rune": {"name": "Ancient Rune", "school": School.RUNIC, "tier": Tier.MASTER, "mp_cost": 120, "cast_time": 5.0, "cooldown": 90.0, "range": 30.0, "effect": "place_rune", "rune_type": "explosive", "damage": 250},
-		
-		# === VOID SCHOOL ===
-		"void_touch": {"name": "Void Touch", "school": School.VOID, "tier": Tier.BASIC, "mp_cost": 18, "cast_time": 1.0, "cooldown": 3.0, "range": 5.0, "effect": "damage", "power": 70, "ignores_armor": true},
-		"void_zone": {"name": "Void Zone", "school": School.VOID, "tier": Tier.NOVICE, "mp_cost": 35, "cast_time": 2.0, "cooldown": 15.0, "range": 25.0, "effect": "aoe_damage", "power": 40, "aoe_radius": 8.0, "duration": 10.0, "silences": true},
-		"void_shift": {"name": "Void Shift", "school": School.VOID, "tier": Tier.ADEPT, "mp_cost": 55, "cast_time": 2.5, "cooldown": 35.0, "range": 0.0, "effect": "phase_out", "duration": 5.0, "untargetable": true},
-		"entropy": {"name": "Entropy", "school": School.VOID, "tier": Tier.MASTER, "mp_cost": 145, "cast_time": 4.0, "cooldown": 80.0, "range": 30.0, "effect": "dispel_all", "aoe_radius": 15.0},
-		"void_annihilation": {"name": "Void Annihilation", "school": School.VOID, "tier": Tier.WORLD, "mp_cost": 650, "cast_time": 15.0, "cooldown": 1000.0, "range": 100.0, "effect": "erase_existence", "aoe_radius": 50.0, "permanent": true}
+func register_spell(name: String, school: SpellSchool, tier: SpellTier, mana_cost: int, cooldown: float, cast_time: float, description: String, effects: Dictionary):
+	spell_database[name] = {
+		"name": name,
+		"school": school,
+		"tier": tier,
+		"mana_cost": mana_cost,
+		"cooldown": cooldown,
+		"cast_time": cast_time,
+		"description": description,
+		"effects": effects,
+		"last_cast": -999.0
 	}
 
-func cast_spell(spell_id: String, caster: Node, target: Variant, position: Vector3 = Vector3.ZERO) -> bool:
-	if not spell_registry.has(spell_id):
-		print("[MagicSystem] Unknown spell: ", spell_id)
+func get_spell(spell_name: String) -> Dictionary:
+	return spell_database.get(spell_name, {})
+
+func can_cast(spell_name: String, current_mana: float, current_time: float) -> bool:
+	var spell = get_spell(spell_name)
+	if spell.is_empty():
 		return false
 	
-	var spell_data = spell_registry[spell_id].duplicate()
-	
-	# Check if caster has enough MP
-	var caster_mp = caster.get("mp", 0) if caster.has_method("get") or caster is Node else 0
-	if caster_mp < spell_data.mp_cost:
-		print("[MagicSystem] Not enough MP for ", spell_data.name)
+	if current_mana < spell.mana_cost:
 		return false
 	
-	# Check cooldown
-	var cooldown_key = "%s_%s" % [spell_id, caster.get_path() if caster is Node else str(caster)]
-	if cooldowns.has(cooldown_key) and cooldowns[cooldown_key] > 0:
-		print("[MagicSystem] Spell on cooldown: ", spell_data.name)
+	if current_time - spell.last_cast < spell.cooldown:
 		return false
-	
-	# Check if already casting
-	if active_casts.has(caster):
-		print("[MagicSystem] Already casting")
-		return false
-	
-	# Begin casting
-	active_casts[caster] = {
-		"spell_data": spell_data,
-		"target": target,
-		"position": position,
-		"start_time": Time.get_ticks_msec(),
-		"cast_time": spell_data.cast_time
-	}
-	
-	emit_signal("spell_cast", caster, spell_data, target)
-	
-	# Instant cast spells
-	if spell_data.get("instant", false) or spell_data.cast_time <= 0:
-		complete_spell(caster)
-		return true
 	
 	return true
 
-func _process(delta: float) -> void:
-	var current_time = Time.get_ticks_msec()
-	var delta_sec = delta
+func execute_spell(spell_name: String, caster: Node, target_position: Vector3, target_node: Node = null) -> bool:
+	var spell = get_spell(spell_name)
+	if spell.is_empty():
+		print("[MagicSystem] Spell not found: ", spell_name)
+		return false
 	
-	# Update active casts
-	for caster in active_casts.keys():
-		var cast_info = active_casts[caster]
-		var elapsed = (current_time - cast_info.start_time) / 1000.0
-		
-		if elapsed >= cast_info.cast_time:
-			complete_spell(caster)
+	if not can_cast(spell_name, caster.mana if caster.has_property("mana") else 9999, Time.get_ticks_msec() / 1000.0):
+		print("[MagicSystem] Cannot cast ", spell_name)
+		return false
 	
-	# Update cooldowns
-	for key in cooldowns.keys():
-		cooldowns[key] -= delta_sec
-		if cooldowns[key] <= 0:
-			cooldowns.erase(key)
+	print("[MagicSystem] Casting: ", spell_name, " (Tier: ", SpellTier.keys()[spell.tier], ", School: ", SpellSchool.keys()[spell.school], ")")
 	
-	# Update channeling spells
-	for caster in channeling_spells.keys():
-		var channel_info = channeling_spells[caster]
-		channel_info.elapsed += delta_sec
-		
-		if channel_info.elapsed >= channel_info.channel_duration:
-			stop_channeling(caster)
-
-func complete_spell(caster: Node) -> void:
-	if not active_casts.has(caster):
-		return
+	# Apply spell effects
+	apply_spell_effects(spell, caster, target_position, target_node)
 	
-	var cast_info = active_casts[caster]
-	var spell_data = cast_info.spell_data
-	var target = cast_info.target
-	var position = cast_info.position
+	# Update cooldown
+	spell.last_cast = Time.get_ticks_msec() / 1000.0
 	
-	# Deduct MP cost
-	if caster.has_method("consume_mp"):
-		caster.consume_mp(spell_data.mp_cost)
-	elif caster is Node and caster.has_meta("mp"):
-		var current_mp = caster.get_meta("mp")
-		caster.set_meta("mp", current_mp - spell_data.mp_cost)
+	emit_signal("spell_cast", spell_name, caster, target_node)
 	
-	# Apply spell effect
-	apply_spell_effect(spell_data, caster, target, position)
+	# Check for world-altering spells
+	if spell.tier == SpellTier.WORLD:
+		emit_signal("world_altered", spell_name, target_position)
 	
-	# Set cooldown
-	var cooldown_key = "%s_%s" % [spell_data.get("id", ""), caster.get_path() if caster is Node else str(caster)]
-	cooldowns[cooldown_key] = spell_data.cooldown
+	return true
+
+func apply_spell_effects(spell: Dictionary, caster: Node, target_position: Vector3, target_node: Node):
+	var effects = spell.effects
 	
-	# Check for World Tier spells
-	if spell_data.tier == Tier.WORLD:
-		trigger_world_alteration(spell_data, caster, target, position)
+	# Damage effects
+	if effects.has("damage"):
+		deal_damage(target_node, effects.damage, SpellSchool.keys()[spell.school])
 	
-	active_casts.erase(caster)
-	emit_signal("spell_completed", caster, spell_data)
-
-func apply_spell_effect(spell_data: Dictionary, caster: Node, target: Variant, position: Vector3) -> void:
-	var effect = spell_data.effect
+	# Healing effects
+	if effects.has("heal"):
+		heal_target(target_node, effects.heal)
 	
-	match effect:
-		"damage":
-			deal_damage(caster, target, spell_data.power, spell_data.get("element", ""))
-		
-		"aoe_damage":
-			deal_aoe_damage(caster, position if target == null else get_target_position(target), 
-				spell_data.power, spell_data.get("aoe_radius", 5.0), spell_data.get("element", ""))
-		
-		"heal":
-			heal_target(caster, target, spell_data.power)
-		
-		"aoe_heal":
-			heal_aoe(caster, position if target == null else get_target_position(target), 
-				spell_data.power, spell_data.get("aoe_radius", 10.0))
-		
-		"buff":
-			apply_buff(caster, target, spell_data)
-		
-		"summon":
-			summon_entity(caster, position if target == null else get_target_position(target), spell_data)
-		
-		"teleport", "teleport_self", "teleport_party":
-			perform_teleport(caster, target, position, spell_data)
-		
-		"create_barrier":
-			create_barrier(caster, position, spell_data)
-		
-		"terrain_alter", "terraform", "world_transform":
-			alter_terrain(caster, position, spell_data)
-		
-		"massive_aoe", "mass_death", "massive_damage":
-			deal_massive_aoe(caster, position if target == null else get_target_position(target), 
-				spell_data.power, spell_data.get("aoe_radius", 15.0))
-		
-		_:
-			print("[MagicSystem] Unhandled effect type: ", effect)
-
-func deal_damage(caster: Node, target: Variant, power: int, element: String = "") -> void:
-	if target is Node:
-		var damage = calculate_damage(power, caster, target, element)
-		if target.has_method("take_damage"):
-			target.take_damage(damage, element, caster)
-
-func deal_aoe_damage(caster: Node, center: Vector3, power: int, radius: float, element: String = "") -> void:
-	# Find all enemies in radius and damage them
-	var space_state = get_tree().root.get_world_3d().direct_space_state
-	var query = PhysicsShapeQueryParameters3D.new()
-	query.collision_mask = 2 # Enemy layer
-	query.transform = Transform3D(Basis(), center)
+	# Status effects
+	if effects.has("status"):
+		apply_status_effect(target_node, effects.status, effects.get("duration", 5))
 	
-	var sphere = SphereShape3D.new()
-	sphere.radius = radius
-	query.shape = sphere
+	# Area effects
+	if effects.has("radius"):
+		apply_area_effects(spell, target_position, effects.radius)
 	
-	var results = space_state.intersect_shape(query, 100)
-	for result in results:
-		var collider = result.collider
-		if collider != caster:
-			deal_damage(caster, collider, power, element)
+	# Terrain alteration
+	if effects.get("alters_terrain", false):
+		alter_terrain(spell.name, target_position, effects)
 
-func heal_target(caster: Node, target: Variant, power: int) -> void:
-	if target is Node and target.has_method("heal"):
-		target.heal(power, caster)
+func deal_damage(target: Node, amount: float, damage_type: String):
+	if target and target.has_method("take_damage"):
+		target.take_damage(amount, damage_type)
+		print("[MagicSystem] Dealt ", amount, " ", damage_type, " damage")
 
-func heal_aoe(caster: Node, center: Vector3, power: int, radius: float) -> void:
-	# Find all allies in radius and heal them
-	# Implementation similar to deal_aoe_damage but for allies
-	pass
+func heal_target(target: Node, amount: float):
+	if target and target.has_method("heal"):
+		target.heal(amount)
+		print("[MagicSystem] Healed ", amount, " HP")
 
-func apply_buff(caster: Node, target: Variant, spell_data: Dictionary) -> void:
-	if target is Node and target.has_method("apply_buff"):
-		target.apply_buff(spell_data)
+func apply_status_effect(target: Node, effect_type: String, duration: float):
+	if target and target.has_method("add_status_effect"):
+		target.add_status_effect(effect_type, duration)
+		print("[MagicSystem] Applied status: ", effect_type, " for ", duration, "s")
 
-func summon_entity(caster: Node, position: Vector3, spell_data: Dictionary) -> void:
-	# Spawn summoned entity at position
-	pass
+func apply_area_effects(spell: Dictionary, center: Vector3, radius: float):
+	print("[MagicSystem] Area effect: ", spell.name, " with radius ", radius)
+	# In real implementation, find all entities in radius and apply effects
 
-func perform_teleport(caster: Node, target: Variant, position: Vector3, spell_data: Dictionary) -> void:
-	var dest_position = position
-	if target is Vector3:
-		dest_position = target
-	elif target is Node:
-		dest_position = target.global_position
-	
-	if caster is Node:
-		caster.global_position = dest_position
+func alter_terrain(spell_name: String, location: Vector3, effects: Dictionary):
+	print("[MagicSystem] TERRAIN ALTERED by ", spell_name, " at ", location)
+	print("  Effects: ", effects)
+	# In real implementation, modify voxel data permanently
 
-func create_barrier(caster: Node, position: Vector3, spell_data: Dictionary) -> void:
-	# Create barrier object at position
-	pass
-
-func alter_terrain(caster: Node, position: Vector3, spell_data: Dictionary) -> void:
-	if WorldManager:
-		# Modify terrain based on spell
-		var radius = spell_data.get("aoe_radius", 10.0)
-		var block_type = get_terrain_block_for_spell(spell_data)
-		
-		for x in range(-int(radius), int(radius) + 1):
-			for z in range(-int(radius), int(radius) + 1):
-				if x * x + z * z <= radius * radius:
-					var world_pos = Vector3i(position.x + x, position.y, position.z + z)
-					WorldManager.set_block(world_pos, block_type)
-
-func get_terrain_block_for_spell(spell_data: Dictionary) -> int:
-	if spell_data.get("element") == "ice":
-		return 9 # Crystal/Ice
-	elif spell_data.get("element") == "fire":
-		return 15 # Fire Block
-	else:
-		return 3 # Stone
-
-func trigger_world_alteration(spell_data: Dictionary, caster: Node, target: Variant, position: Vector3) -> void:
-	var event_id = "%s_%d" % [spell_data.name, int(Time.get_unix_time_from_system())]
-	var description = "%s cast %s, altering the world!" % [caster.name if caster is Node else "Unknown", spell_data.name]
-	
-	emit_signal("world_altered", event_id, description)
-	print("[MagicSystem] WORLD ALTERATION: ", description)
-	
-	if GameManager:
-		GameManager.trigger_world_event(event_id)
-
-func stop_channeling(caster: Node) -> void:
-	if channeling_spells.has(caster):
-		channeling_spells.erase(caster)
-
-func cast_spell_by_name(spell_name: String, caster: Node, target: Variant) -> bool:
-	# Find spell by name (case-insensitive)
-	for spell_id in spell_registry.keys():
-		if spell_registry[spell_id].name.nocasecmp_to(spell_name) == 0:
-			return cast_spell(spell_id, caster, target)
-	return false
-
-func get_spell_info(spell_id: String) -> Dictionary:
-	return spell_registry.get(spell_id, {})
-
-func list_spells_by_school(school: School) -> Array:
+func get_spells_by_school(school: SpellSchool) -> Array:
 	var result = []
-	for spell_id in spell_registry.keys():
-		if spell_registry[spell_id].school == school:
-			result.append(spell_id)
+	for spell_data in spell_database.values():
+		if spell_data.school == school:
+			result.append(spell_data)
 	return result
 
-func list_spells_by_tier(tier: Tier) -> Array:
+func get_spells_by_tier(tier: SpellTier) -> Array:
 	var result = []
-	for spell_id in spell_registry.keys():
-		if spell_registry[spell_id].tier == tier:
-			result.append(spell_id)
+	for spell_data in spell_database.values():
+		if spell_data.tier == tier:
+			result.append(spell_data)
 	return result
-
-func calculate_damage(base_power: int, caster: Node, target: Node, element: String = "") -> int:
-	var caster_magic = caster.get("magic", 10) if caster.has_method("get") or caster is Node else 10
-	var target_defense = target.get("defense", 10) if target.has_method("get") or target is Node else 10
-	
-	var damage = base_power + (caster_magic * 2) - target_defense
-	damage = max(1, damage) # Minimum 1 damage
-	
-	# Element modifiers could go here
-	
-	return damage
-
-func get_target_position(target: Variant) -> Vector3:
-	if target is Vector3:
-		return target
-	elif target is Node:
-		return target.global_position
-	return Vector3.ZERO

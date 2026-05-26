@@ -1,0 +1,51 @@
+[gd_scene load_steps=6 format=3 uid="uid://test_world_001"]
+
+[ext_resource type="Script" path="res://scripts/core/main_scene.gd" id="1_main_scene"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_hud.tscn" id="3_hud"]
+
+[sub_resource type="WorldEnvironment" id="WorldEnvironment_res"]
+ambient_light_source = 2
+ambient_light_color = Color(0.15, 0.18, 0.25, 1)
+ambient_light_energy = 0.4
+glow_enabled = true
+glow_intensity = 0.3
+glow_bloom = 0.2
+
+[node name="TestWorld" type="Node3D"]
+script = ExtResource("1_main_scene")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("WorldEnvironment_res")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.965926, -0.258819, 0, 0.17101, 0.637872, -0.750111, 0.178606, 0.724576, 0.665462, 0, 50, 0)
+shadow_enabled = true
+light_color = Color(0.95, 0.92, 0.85, 1)
+light_energy = 1.2
+light_angular_distance = 0.5
+
+[node name="SkyAndFog" type="SkyAndFog" parent="."]
+sky_type = 1
+procedural_sky_top_color = Color(0.1, 0.15, 0.25, 1)
+procedural_sky_horizon_color = Color(0.25, 0.35, 0.45, 1)
+fog_enabled = true
+fog_density = 0.005
+fog_top_color = Color(0.2, 0.25, 0.35, 1)
+fog_bottom_color = Color(0.05, 0.08, 0.12, 1)
+
+[node name="PlayerSpawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
+
+[node name="Player" parent="PlayerSpawn" instance=ExtResource("2_player")]
+
+[node name="GameHUD" type="CanvasLayer" parent="." instance=ExtResource("3_hud")]
+
+[node name="VoxelWorld" type="Node3D" parent="."]
+# Placeholder for voxel world generation
+# Will be populated by WorldManager at runtime
+
+[node name="ChunkLoader" type="Node3D" parent="."]
+# Handles dynamic chunk loading/unloading
+
+[connection signal="world_loaded" from="." to="." method="_on_world_loaded"]
