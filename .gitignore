@@ -1,0 +1,28 @@
+```
+# Godot-specific ignores
+*.import
+*.remap
+export_presets.cfg
+.unse
+.ods
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Configuration
+*.cfg
+*.ini
+*.toml
+```
