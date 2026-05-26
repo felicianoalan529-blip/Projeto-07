@@ -1,12 +1,4 @@
 ```
-# Godot-specific ignores
-*.import
-*.uid
-export_presets.cfg
-.rid_map
-.editor
-.godot/
-
 # Compiled and build artifacts
 *.pyc
 __pycache__/
@@ -15,22 +7,16 @@ __pycache__/
 *.exe
 *.dll
 *.so
-*.a
+*.class
 *.out
 
 # Dependencies
-.venv/
-venv/
 node_modules/
-dist/
-build/
-target/
-.gradle/
-.mypy_cache/
-.pytest_cache/
-.coverage
-coverage/
-htmlcov/
+venv/
+.venv/
+.env
+.env.local
+.env.*
 
 # Logs and temp files
 *.log
@@ -38,20 +24,28 @@ htmlcov/
 *.swp
 *.swo
 
-# Environment
-.env
-.env.local
-.env.*
-
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# System
+# System files
 .DS_Store
 Thumbs.db
+
+# Coverage and testing
+.coverage
+coverage/
+htmlcov/
+
+# Build directories
+dist/
+build/
+target/
+.gradle/
+
+# Python specific
+.mypy_cache/
+.pytest_cache/
 
 # Compressed files
 *.zip

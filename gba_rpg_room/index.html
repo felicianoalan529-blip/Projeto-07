@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎮 Aventura Pokémon GBA - Edição Expandida</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Tela do jogo -->
+        <canvas id="gameCanvas" width="480" height="320"></canvas>
+        
+        <!-- Efeitos de Tela (Dia/Noite, Clima) -->
+        <div id="screen-overlay"></div>
+        
+        <!-- Interface de Diálogo -->
+        <div id="dialog-box" class="hidden">
+            <div id="dialog-name"></div>
+            <div id="dialog-text"></div>
+            <div id="dialog-indicator">▼</div>
+        </div>
+        
+        <!-- Menu Principal -->
+        <div id="main-menu" class="hidden">
+            <div class="menu-title">MENU PRINCIPAL</div>
+            <ul class="menu-options">
+                <li class="menu-item selected" data-action="mochila">🎒 Mochila</li>
+                <li class="menu-item" data-action="pokemon">⚡ Pokémon</li>
+                <li class="menu-item" data-action="status">📊 Status</li>
+                <li class="menu-item" data-action="treinadores">🏆 Treinadores</li>
+                <li class="menu-item" data-action="medalhas">🏅 Medalhas</li>
+                <li class="menu-item" data-action="salvar">💾 Salvar</li>
+                <li class="menu-item" data-action="opcoes">⚙️ Opções</li>
+                <li class="menu-item" data-action="sair">🚪 Sair</li>
+            </ul>
+        </div>
+        
+        <!-- HUD do Jogador Otimizado -->
+        <div id="player-hud">
+            <div class="hud-info">
+                <span id="player-name">Herói</span>
+                <span id="player-time">☀️ Dia</span>
+            </div>
+            <div class="hud-stats">
+                <div class="hud-stat">
+                    <span class="hud-stat-value" id="hud-steps">0</span>
+                    <span>Passos</span>
+                </div>
+                <div class="hud-stat">
+                    <span class="hud-stat-value" id="hud-money">R$5000</span>
+                    <span>Dinheiro</span>
+                </div>
+                <div class="hud-stat">
+                    <span class="hud-stat-value" id="hud-pokemon">4</span>
+                    <span>Pokémon</span>
+                </div>
+            </div>
+            <div class="hud-badges" id="hud-badges"></div>
+        </div>
+
+        <!-- Indicador de Região -->
+        <div id="region-indicator">VILA INICIAL</div>
+        
+        <!-- Mini-mapa -->
+        <div id="minimap-container">
+            <canvas id="minimap" width="80" height="80"></canvas>
+        </div>
+        
+        <!-- Controles Mobile -->
+        <div id="mobile-controls">
+            <div class="dpad">
+                <button id="btn-up" class="dpad-btn">▲</button>
+                <div class="dpad-row">
+                    <button id="btn-left" class="dpad-btn">◀</button>
+                    <button id="btn-right" class="dpad-btn">▶</button>
+                </div>
+                <button id="btn-down" class="dpad-btn">▼</button>
+            </div>
+            <div class="action-buttons">
+                <button id="btn-a" class="action-btn a-btn">A</button>
+                <button id="btn-b" class="action-btn b-btn">B</button>
+            </div>
+            <div class="system-buttons">
+                <button id="btn-start" class="system-btn start">START</button>
+                <button id="btn-select" class="system-btn select">SELECT</button>
+            </div>
+        </div>
+        
+        <!-- Notificações -->
+        <div id="notification" class="hidden">
+            <span id="notification-text"></span>
+        </div>
+    </div>
+    
+    <!-- Instruções -->
+    <div id="instructions">
+        <h3>🎮 Controles:</h3>
+        <p>⬆️⬇️⬅️➡️ ou WASD - Mover personagem</p>
+        <p>Z ou Enter - Ação/Confirmar (Botão A)</p>
+        <p>X ou Esc - Menu/Voltar (Botão B)</p>
+        <p>Enter no menu - Selecionar opção</p>
+        <p>R - Reiniciar posição</p>
+        <hr style="margin: 10px 0; border-color: #406080;">
+        <p style="color: #ffd700;">✨ Novidades: Sistema de batalha, dia/noite, clima, 8 regiões, 15+ NPCs, 20+ itens, missões!</p>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
