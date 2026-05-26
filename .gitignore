@@ -1,0 +1,43 @@
+```
+# Godot-specific ignores
+*.import
+*.remap
+export_presets.cfg
+.autoload_singleton_globs
+.editor/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.app
+*.apk
+*.aab
+*.zip
+*.tar
+*.tar.gz
+
+# Dependencies and caches
+.godot/
+*.import
+*.remap
+project.settings
+local://*
+file://*
+
+# Temp files
+*.tmp
+*.temp
+*~
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
+```
