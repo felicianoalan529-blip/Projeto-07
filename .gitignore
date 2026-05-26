@@ -3,41 +3,26 @@
 *.import
 *.remap
 export_presets.cfg
-.autoload_singleton_globs
-.editor/
+.unse
+.ods
 
 # Build artifacts
 *.exe
 *.dll
 *.so
 *.dylib
-*.app
-*.apk
-*.aab
-*.zip
-*.tar
-*.tar.gz
 
-# Dependencies and caches
-.godot/
-*.import
-*.remap
-project.settings
-local://*
-file://*
-
-# Temp files
+# Temporary files
 *.tmp
 *.temp
-*~
+*.log
+
+# System files
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
-*.env.*
-
-# Logs
-*.log
+# Configuration
+*.cfg
+*.ini
+*.toml
 ```
